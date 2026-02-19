@@ -3,26 +3,28 @@ import tkinter as tk
 from tkinter import ttk
 import re
 
-def load_or_create_contexts(input_path="input.txt",json_path="number_contexts.json"):
+def load_or_create_contexts(input_path="input.txt", json_path="number_contexts.json"):
     try:
-        with open(input_path,"r",encoding="utf-8") as f:
-            full_text=f.read()
+        with open(input_path, "r", encoding="utf-8") as f:
+            full_text = f.read()
     except Exception as e:
         print(f"Cannot read input.txt: {e}")
         return []
-    tokens=full_text.split()
-    number_occurrences=[]
-    for i,token in enumerate(tokens):
-        for match in re.finditer(r'-?\d+(?:[.,]\d+)*',token):
-            number_occurrences.append((i,match.group(0)))
-    contexts=[]
-    for i,number in number_occurrences:
-        start=max(0,i-10)
-        end=min(len(tokens),i+11)
-        before=tokens[start:i]
-        after=tokens[i+1:end]
-        text=" ".join(before+[number]+after)
-        contexts.append({"input_text":text,"number":number,"label":0})
+    tokens = full_text.split()
+    number_occurrences = []
+    for i, token in enumerate(tokens):
+        # find every maximal run of consecutive digits
+        for match in re.finditer(r'\d+', token):
+            number = match.group(0)
+            number_occurrences.append((i, number))
+    contexts = []
+    for i, number in number_occurrences:
+        start = max(0, i - 10)
+        end = min(len(tokens), i + 11)
+        before = tokens[start:i]
+        after = tokens[i+1:end]
+        text = " ".join(before + [number] + after)
+        contexts.append({"input_text": text, "number": number, "label": 0})
     return contexts
 
 def save_contexts(contexts,json_path="number_contexts.json"):
