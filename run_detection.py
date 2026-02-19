@@ -4,14 +4,6 @@ from tkinter import ttk
 import os
 
 def load_or_create_contexts(input_path="input.txt", json_path="number_contexts.json"):
-    if os.path.exists(json_path):
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                contexts = json.load(f)
-            print(f"Loaded {len(contexts)} existing entries from {json_path}")
-            return contexts
-        except Exception as e:
-            print(f"JSON load failed: {e}, creating new")
     try:
         with open(input_path, 'r', encoding='utf-8') as f:
             full_text = f.read()
@@ -39,7 +31,7 @@ def load_or_create_contexts(input_path="input.txt", json_path="number_contexts.j
             'number': cleaned,
             'label': 0
         })
-    print(f"Created {len(contexts)} new entries")
+    #print(f"Created {len(contexts)} new entries")
     return contexts
 
 def save_contexts(contexts, json_path="number_contexts.json"):
@@ -61,7 +53,7 @@ class Labeler:
         self.root.title("Label 0/1 – click to toggle, SPACE = next")
         self.root.geometry("1200x750")
         self.labels = [ctx['label'] for ctx in contexts]
-        self.page_vars = {}
+        self.row_widgets = {}
         self.frame = ttk.Frame(self.root)
         self.frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         self.canvas = tk.Canvas(self.frame)
@@ -82,39 +74,29 @@ class Labeler:
         self.show_page()
         self.root.mainloop()
 
-    def flush_page_vars(self):
-        for pos, var in self.page_vars.items():
-            self.labels[pos] = var.get()
-            self.contexts[pos]['label'] = var.get()
-
     def show_page(self):
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
-        self.page_vars = {}
+        self.row_widgets = {}
         start = self.current_page * self.page_size
         end = min(start + self.page_size, len(self.contexts))
         for idx in range(start, end):
-            i = idx
-            ctx = self.contexts[i]
+            ctx = self.contexts[idx]
             tokens = ctx['input_text'].split()
-            try:
-                num_idx = tokens.index(ctx['number'])
-            except ValueError:
-                num_idx = len(tokens) // 2
+            num_idx = tokens.index(ctx['number'])
             before = ' '.join(tokens[max(0, num_idx - 10):num_idx])
             number = ctx['number']
             after = ' '.join(tokens[num_idx + 1:num_idx + 11])
             row_frame = ttk.Frame(self.scrollable_frame)
             row_frame.pack(fill=tk.X, pady=5, padx=5)
-            var = tk.IntVar(value=self.labels[i])
-            self.page_vars[i] = var
+            var = tk.IntVar(value=self.labels[idx])
             chk = ttk.Checkbutton(
                 row_frame,
                 variable=var,
-                command=lambda pos=i, v=var: self.toggle_label(pos, v)
+                command=lambda pos=idx, v=var: self.toggle_label(pos, v)
             )
             chk.pack(side=tk.LEFT, padx=6)
-            bg = "#dce3ec" if self.labels[i] == 1 else "#f0f0f0"
+            bg = "#d4edda" if self.labels[idx] == 1 else "#f8d7da"
             txt = tk.Text(
                 row_frame,
                 height=2,
@@ -126,21 +108,26 @@ class Labeler:
                 state=tk.NORMAL
             )
             txt.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            txt.tag_configure("context", foreground="#888888")
-            txt.tag_configure("number", foreground="#1a5fa8", font=("TkDefaultFont", 15, "bold"))
+            txt.tag_configure("context", foreground="#aaaaaa")
+            txt.tag_configure("number", foreground="#c0392b", font=("TkDefaultFont", 15, "bold"))
             txt.insert(tk.END, before + (" " if before else ""), "context")
             txt.insert(tk.END, number, "number")
             txt.insert(tk.END, (" " if after else "") + after, "context")
             txt.configure(state=tk.DISABLED)
-            txt.bind("<Button-1>", lambda e, pos=i, v=var, t=txt: self.toggle_via_click(pos, v, t))
+            txt.bind("<Button-1>", lambda e, pos=idx, v=var, t=txt: self.toggle_via_click(pos, v, t))
+            self.row_widgets[idx] = (var, txt)
         status_text = f"Page {self.current_page + 1} / {self.total_pages}   "
-        status_text += f"Entries {start+1}–{end}   Click row to toggle label"
+        status_text += f"Entries {start+1}–{end}   Click row to toggle 1"
         self.status.config(text=status_text)
 
     def toggle_label(self, pos, var):
-        self.labels[pos] = var.get()
-        self.contexts[pos]['label'] = var.get()
-        self.show_page()
+        new_val = var.get()
+        self.labels[pos] = new_val
+        self.contexts[pos]['label'] = new_val
+        if pos in self.row_widgets:
+            _, txt = self.row_widgets[pos]
+            txt.configure(bg="#d4edda" if new_val == 1 else "#f8d7da")
+        save_contexts(self.contexts, self.json_path)
 
     def toggle_via_click(self, pos, var, txt=None):
         new_val = 1 - var.get()
@@ -148,17 +135,15 @@ class Labeler:
         self.toggle_label(pos, var)
 
     def next_page(self, event=None):
-        self.flush_page_vars()
-        save_contexts(self.contexts, self.json_path)
         if self.current_page < self.total_pages - 1:
             self.current_page += 1
             self.show_page()
         else:
+            save_contexts(self.contexts, self.json_path)
             print("Last page saved")
             self.status.config(text="Done – close window when ready")
 
     def on_closing(self):
-        self.flush_page_vars()
         save_contexts(self.contexts, self.json_path)
         print("Final save done")
         self.root.destroy()
