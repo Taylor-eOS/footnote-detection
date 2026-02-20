@@ -34,7 +34,7 @@ def load_entries(input_path=INPUT_FILE):
             start,end=_snap_to_whitespace_bounds(text,start,end)
             context=text[start:end]
             display_start=max(0,i-CONTEXT_GUI)
-            display_end=min(n,j+CONTEXT_GUI-10)
+            display_end=min(n,j+CONTEXT_GUI-5)
             display_start,display_end=_snap_to_whitespace_bounds(text,display_start,display_end)
             snippet=text[display_start:display_end].replace("\n"," ")
             while "  " in snippet:
@@ -83,36 +83,44 @@ class Labeler(tk.Tk):
         self._refresh_status()
 
     def _build_ui(self):
-        frame=tk.Frame(self)
-        frame.pack(fill=tk.BOTH,expand=True,padx=10,pady=10)
-        self.text=tk.Text(frame,font=("Consolas",11),wrap=tk.WORD,cursor="arrow")
-        self.text.pack(side=tk.LEFT,fill=tk.BOTH,expand=True)
-        self.text.tag_configure("context",foreground="#666666")
-        self.text.tag_configure("num",foreground="#c0392b",font=("Consolas",11,"bold"))
-        self.text.tag_configure("labeled",background="#d4edda")
-        scrollbar=tk.Scrollbar(frame,orient=tk.VERTICAL,command=self.text.yview)
-        scrollbar.pack(side=tk.RIGHT,fill=tk.Y)
+        frame = tk.Frame(self)
+        frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.text = tk.Text(frame, font=("Consolas", 11), wrap=tk.NONE, cursor="arrow")
+        self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.text.tag_configure("context", foreground="#666666")
+        self.text.tag_configure("num", foreground="#c0392b", font=("Consolas", 11, "bold"))
+        self.text.tag_configure("labeled", background="#d4edda")
+        scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL, command=self.text.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.text.config(yscrollcommand=scrollbar.set)
-        self.line_to_index={}
-        for idx,entry in enumerate(self.entries):
-            line=idx+1
-            self.line_to_index[line]=idx
-            s=entry["snippet"]
-            hs=entry["highlight_start"]
-            he=entry["highlight_end"]
-            self.text.insert(tk.END,s[:hs],"context")
-            self.text.insert(tk.END,s[hs:he],"num")
-            self.text.insert(tk.END,s[he:]+"\n","context")
-            if entry.get("label",0)==1:
-                self.text.tag_add("labeled",f"{line}.0",f"{line}.end")
-        self.text.bind("<Key>",lambda e:"break")
-        self.text.bind("<Button-1>",self._on_click)
-        btn_frame=tk.Frame(self)
-        btn_frame.pack(fill=tk.X,padx=10,pady=5)
-        tk.Button(btn_frame,text="Save",command=self._save).pack(side=tk.LEFT,padx=5)
-        tk.Button(btn_frame,text="Quit",command=self._on_quit).pack(side=tk.RIGHT,padx=5)
-        self.status=tk.Label(self,text="",anchor="w")
-        self.status.pack(fill=tk.X,padx=10,pady=2)
+        self.line_to_index = {}
+        max_line_length = 80
+        for idx, entry in enumerate(self.entries):
+            line = idx + 1
+            self.line_to_index[line] = idx
+            s = entry["snippet"]
+            hs = entry["highlight_start"]
+            he = entry["highlight_end"]
+            if len(s) > max_line_length:
+                s = s[:max_line_length-3] + "..."
+                if he > max_line_length-3:
+                    he = max_line_length-3
+                if hs > max_line_length-3:
+                    hs = max_line_length-3
+            s = s.ljust(max_line_length)
+            self.text.insert(tk.END, s[:hs], "context")
+            self.text.insert(tk.END, s[hs:he], "num")
+            self.text.insert(tk.END, s[he:] + "\n", "context")
+            if entry.get("label", 0) == 1:
+                self.text.tag_add("labeled", f"{line}.0", f"{line}.end")
+        self.text.bind("<Key>", lambda e: "break")
+        self.text.bind("<Button-1>", self._on_click)
+        btn_frame = tk.Frame(self)
+        btn_frame.pack(fill=tk.X, padx=10, pady=5)
+        tk.Button(btn_frame, text="Save", command=self._save).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Quit", command=self._on_quit).pack(side=tk.RIGHT, padx=5)
+        self.status = tk.Label(self, text="", anchor="w")
+        self.status.pack(fill=tk.X, padx=10, pady=2)
 
     def _status_text(self):
         total=len(self.entries)
@@ -122,52 +130,27 @@ class Labeler(tk.Tk):
     def _refresh_status(self):
         self.status.config(text=self._status_text())
 
-    def _find_forward_consecutive(self,anchor_index):
-        result=[]
-        try:
-            anchor_num=int(self.entries[anchor_index]["number"])
-        except Exception:
-            return result
-        next_expected=anchor_num+1
-        search_start=anchor_index+1
-        while search_start<len(self.entries):
-            found=False
-            for i in range(search_start,len(self.entries)):
-                try:
-                    val=int(self.entries[i]["number"])
-                except Exception:
-                    continue
-                if val==next_expected:
-                    result.append(i)
-                    next_expected+=1
-                    search_start=i+1
-                    found=True
-                    break
-            if not found:
-                break
-        return result
-
-    def _on_click(self,event):
-        clicked_index=self.text.index(f"@{event.x},{event.y}")
-        line_num=int(clicked_index.split(".")[0])
+    def _on_click(self, event):
+        clicked_index = self.text.index(f"@{event.x},{event.y}")
+        line_num = int(clicked_index.split(".")[0])
         if line_num not in self.line_to_index:
             return "break"
-        anchor_idx=self.line_to_index[line_num]
-        if self.entries[anchor_idx]["label"]==1:
-            indices=[anchor_idx]+self._find_forward_consecutive(anchor_idx)
+        anchor_idx = self.line_to_index[line_num]
+        indices = [anchor_idx] + self._all_forward_indices(anchor_idx)
+        if self.entries[anchor_idx]["label"] == 1:
             for idx in indices:
-                if self.entries[idx]["label"]==1:
-                    self.entries[idx]["label"]=0
-                    self.text.tag_remove("labeled",f"{idx+1}.0",f"{idx+1}.end")
+                self.entries[idx]["label"] = 0
+                self.text.tag_remove("labeled", f"{idx+1}.0", f"{idx+1}.end")
         else:
-            indices=[anchor_idx]+self._find_forward_consecutive(anchor_idx)
             for idx in indices:
-                if self.entries[idx]["label"]!=1:
-                    self.entries[idx]["label"]=1
-                    self.text.tag_add("labeled",f"{idx+1}.0",f"{idx+1}.end")
+                self.entries[idx]["label"] = 1
+                self.text.tag_add("labeled", f"{idx+1}.0", f"{idx+1}.end")
         self._refresh_status()
         self._save()
         return "break"
+
+    def _all_forward_indices(self, anchor_index):
+        return list(range(anchor_index + 1, len(self.entries))) 
 
     def _save(self):
         save_entries(self.entries,OUTPUT_PATH)
