@@ -130,27 +130,51 @@ class Labeler(tk.Tk):
     def _refresh_status(self):
         self.status.config(text=self._status_text())
 
-    def _on_click(self, event):
-        clicked_index = self.text.index(f"@{event.x},{event.y}")
-        line_num = int(clicked_index.split(".")[0])
+    def _find_forward_consecutive(self,anchor_index):
+        result=[]
+        try:
+            anchor_num=int(self.entries[anchor_index]["number"])
+        except Exception:
+            return result
+        next_expected=anchor_num+1
+        search_start=anchor_index+1
+        while search_start<len(self.entries):
+            found=False
+            for i in range(search_start,len(self.entries)):
+                try:
+                    val=int(self.entries[i]["number"])
+                except Exception:
+                    continue
+                if val==next_expected:
+                    result.append(i)
+                    next_expected+=1
+                    search_start=i+1
+                    found=True
+                    break
+            if not found:
+                break
+        return result
+
+    def _on_click(self,event):
+        clicked_index=self.text.index(f"@{event.x},{event.y}")
+        line_num=int(clicked_index.split(".")[0])
         if line_num not in self.line_to_index:
             return "break"
-        anchor_idx = self.line_to_index[line_num]
-        indices = [anchor_idx] + self._all_forward_indices(anchor_idx)
-        if self.entries[anchor_idx]["label"] == 1:
-            for idx in indices:
-                self.entries[idx]["label"] = 0
-                self.text.tag_remove("labeled", f"{idx+1}.0", f"{idx+1}.end")
+        anchor_idx=self.line_to_index[line_num]
+        if self.entries[anchor_idx]["label"]==1:
+            for idx in range(anchor_idx, len(self.entries)):
+                if self.entries[idx]["label"]==1:
+                    self.entries[idx]["label"]=0
+                    self.text.tag_remove("labeled", f"{idx+1}.0", f"{idx+1}.end")
         else:
+            indices=[anchor_idx]+self._find_forward_consecutive(anchor_idx)
             for idx in indices:
-                self.entries[idx]["label"] = 1
-                self.text.tag_add("labeled", f"{idx+1}.0", f"{idx+1}.end")
+                if self.entries[idx]["label"]!=1:
+                    self.entries[idx]["label"]=1
+                    self.text.tag_add("labeled", f"{idx+1}.0", f"{idx+1}.end")
         self._refresh_status()
         self._save()
         return "break"
-
-    def _all_forward_indices(self, anchor_index):
-        return list(range(anchor_index + 1, len(self.entries))) 
 
     def _save(self):
         save_entries(self.entries,OUTPUT_PATH)
