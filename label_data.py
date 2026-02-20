@@ -88,7 +88,8 @@ class Labeler(tk.Tk):
         self.text = tk.Text(frame, font=("Consolas", 11), wrap=tk.NONE, cursor="arrow")
         self.text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.text.tag_configure("context", foreground="#666666")
-        self.text.tag_configure("num", foreground="#c0392b", font=("Consolas", 11, "bold"))
+        self.text.tag_configure("num_short", foreground="#c0392b", font=("Consolas", 11, "bold"))
+        self.text.tag_configure("num_long", foreground="#555555", font=("Consolas", 11, "bold"))
         self.text.tag_configure("labeled", background="#d4edda")
         scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL, command=self.text.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -101,6 +102,8 @@ class Labeler(tk.Tk):
             s = entry["snippet"]
             hs = entry["highlight_start"]
             he = entry["highlight_end"]
+            num_len = he - hs
+            num_tag = "num_long" if num_len >= 4 else "num_short"
             if len(s) > max_line_length:
                 s = s[:max_line_length-3] + "..."
                 if he > max_line_length-3:
@@ -109,7 +112,7 @@ class Labeler(tk.Tk):
                     hs = max_line_length-3
             s = s.ljust(max_line_length)
             self.text.insert(tk.END, s[:hs], "context")
-            self.text.insert(tk.END, s[hs:he], "num")
+            self.text.insert(tk.END, s[hs:he], num_tag)
             self.text.insert(tk.END, s[he:] + "\n", "context")
             if entry.get("label", 0) == 1:
                 self.text.tag_add("labeled", f"{line}.0", f"{line}.end")
