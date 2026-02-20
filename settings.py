@@ -7,7 +7,4 @@ JSON_PATH = "ground_truth.json"
 RESULTS_FILE = "inference_results.json"
 CACHE_PATH = "embeddings_cache.npz"
 MODEL_SAVE_PATH = "classifier_head.pt"
-PRETRAIN_PRED_PATH = "pretrain_predictions.json"
-SAVE_BEST = False
 INPUT_JSON = "input.json"
-OUTPUT_JSON = "output.json"
