@@ -6,12 +6,8 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sentence_transformers import SentenceTransformer
 from collections import Counter
+from settings import EMBEDDING_MODEL_NAME, JSON_PATH, CACHE_PATH, MODEL_SAVE_PATH, PRETRAIN_PRED_PATH, SAVE_BEST, RESULTS_FILE
 
-EMBEDDING_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-JSON_PATH = "ground_truth.json"
-CACHE_PATH = "embeddings_cache.npz"
-MODEL_SAVE_PATH = "classifier_head.pt"
-PRETRAIN_PRED_PATH = "pretrain_predictions.json"
 EMBEDDING_DIM = 384
 HIDDEN_DIM = 256
 NUM_LABELS = 2
@@ -171,17 +167,22 @@ def main():
         train_loss, train_acc = train_epoch(model, loader, optimizer, criterion, device, pretrain_preds={})
         current_lr = scheduler.get_last_lr()[0]
         marker = " *" if train_loss < best_loss else ""
-        if train_loss < best_loss:
-            best_loss = train_loss
+        if SAVE_BEST:
+            if train_loss < best_loss:
+                best_loss = train_loss
+                torch.save(model.state_dict(), MODEL_SAVE_PATH)
+        else:
+            model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=device))
             torch.save(model.state_dict(), MODEL_SAVE_PATH)
         print(f"{epoch:>6} {train_loss:>12.4f} {train_acc:>10.4f} {pretrain_acc:>13.4f} {current_lr:>12.6f}{marker}")
         scheduler.step()
     model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=device))
     _, _, all_confidences = evaluate_on_train(model, eval_loader, criterion, device)
-    run_inference_and_save(model, embeddings, data, device, "inference_results.json")
+    run_inference_and_save(model, embeddings, data, device, RESULTS_FILE)
     confidences_arr = np.array(all_confidences)
     print(f"Mean confidence label 0: {confidences_arr[:,0].mean():.4f}")
     print(f"Mean confidence label 1: {confidences_arr[:,1].mean():.4f}")
 
-main()
+if __name__ == "__main__":
+    main()
 
